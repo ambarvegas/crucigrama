@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crucigrama Estratégico - Pistas Progresivas</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --glass-bg: rgba(30, 41, 59, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.15);
+            --emerald: #10b981;
+            --emerald-glow: rgba(16, 185, 129, 0.5);
+            --gold: #fbbf24;
+            --danger: #ef4444;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
+
+        h1 {
+            color: var(--gold);
+            text-shadow: 0 0 15px rgba(251, 191, 36, 0.4);
+            margin-bottom: 5px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            margin-bottom: 30px;
+            text-align: center;
+            max-width: 600px;
+        }
+
+        .app-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            justify-content: center;
+            max-width: 1100px;
+            width: 100%;
+        }
+
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(7, 50px);
+            grid-template-rows: repeat(10, 50px);
+            gap: 4px;
+            justify-content: center;
+        }
+
+        .cell {
+            width: 50px;
+            height: 50px;
+            position: relative;
+        }
+
+        .cell input {
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            border-radius: 8px;
+            box-sizing: border-box;
+            transition: all 0.2s ease;
+        }
+
+        .cell input:focus {
+            outline: none;
+            border-color: var(--emerald);
+            box-shadow: 0 0 15px var(--emerald-glow);
+            background: rgba(16, 185, 129, 0.15);
+            transform: scale(1.05);
+            z-index: 10;
+        }
+
+        .cell-number {
+            position: absolute;
+            top: 2px;
+            left: 4px;
+            font-size: 0.75rem;
+            color: var(--gold);
+            z-index: 5;
+            pointer-events: none;
+            font-weight: bold;
+        }
+
+        .cell.active-word input {
+            background: rgba(251, 191, 36, 0.15);
+            border-color: rgba(251, 191, 36, 0.5);
+        }
+
+        .cell.completed input {
+            color: var(--emerald);
+            border-color: var(--emerald);
+            background: rgba(16, 185, 129, 0.1);
+            text-shadow: 0 0 10px var(--emerald-glow);
+            pointer-events: none;
+            animation: pulse-green 1s ease-out;
+        }
+
+        .clues-container {
+            width: 380px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .clue-item {
+            padding: 12px 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            border: 1px solid transparent;
+        }
+
+        .clue-item:hover {
+            background: rgba(251, 191, 36, 0.1);
+        }
+
+        .clue-item.active {
+            background: rgba(251, 191, 36, 0.2);
+            border-color: rgba(251, 191, 36, 0.6);
+            border-left: 5px solid var(--gold);
+        }
+
+        .clue-item.completed {
+            opacity: 0.4;
+            text-decoration: line-through;
+            border-left: 5px solid var(--emerald);
+            pointer-events: none;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+            z-index: 1000;
+        }
+
+        .modal-overlay.show {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal-content {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            padding: 35px;
+            border-radius: 16px;
+            max-width: 450px;
+            text-align: center;
+            transform: scale(0.95);
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+        }
+
+        .modal-overlay.show .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-icon {
+            font-size: 3.5rem;
+            margin-bottom: 10px;
+        }
+
+        .modal-title {
+            font-size: 1.6rem;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .modal-message {
+            font-size: 1.1rem;
+            line-height: 1.5;
+            color: var(--text-muted);
+            margin-bottom: 25px;
+        }
+
+        .modal-hint-counter {
+            font-size: 0.85rem;
+            color: var(--gold);
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .modal-content.success { border-top: 5px solid var(--emerald); }
+        .modal-content.success .modal-icon { color: var(--emerald); }
+        .modal-content.success .modal-title { color: var(--emerald); }
+
+        .modal-content.error { border-top: 5px solid var(--danger); }
+        .modal-content.error .modal-icon { color: var(--danger); }
+        .modal-content.error .modal-title { color: var(--danger); }
+        .modal-content.error .modal-message { color: var(--text-main); font-weight: 500; font-size: 1.2rem; }
+        .modal-content.error .modal-hint-counter { display: block; }
+
+        button.action-btn {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px var(--emerald-glow);
+        }
+
+        button.action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--emerald-glow);
+        }
+
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.8); }
+            70% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        .shake {
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+            border-color: var(--danger) !important;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(3px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-5px, 0, 0); }
+            40%, 60% { transform: translate3d(5px, 0, 0); }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Crucigrama Estratégico</h1>
+    <p class="subtitle">Escribe la palabra para autovalidar. Si te equivocas, recibirás pistas progresivas para ayudarte a deducirla (Presiona <b>Enter</b> para cerrar los avisos).</p>
+
+    <div class="app-container">
+        <div class="glass-panel">
+            <div id="board" class="board"></div>
+        </div>
+
+        <div class="glass-panel clues-container">
+            <h3 style="margin-top: 0; color: var(--gold); border-bottom: 1px solid var(--glass-border); padding-bottom: 10px;">Palabras a Descubrir</h3>
+            <div id="clues-list"></div>
+        </div>
+    </div>
+
+    <div id="modal" class="modal-overlay" onclick="closeModal()">
+        <div id="modal-content" class="modal-content" onclick="event.stopPropagation()">
+            <div id="modal-icon" class="modal-icon"></div>
+            <div id="modal-title" class="modal-title"></div>
+            <div id="modal-hint-counter" class="modal-hint-counter"></div>
+            <div id="modal-message" class="modal-message"></div>
+            <button id="modal-btn" class="action-btn" onclick="closeModal()">Continuar (Enter)</button>
+        </div>
+    </div>
+
+    <script>
+        // Layout corregido: cruces perfectos, sin secuencias no deseadas.
+        // Las palabras solo comparten celdas en intersecciones válidas.
+        const puzzleData = [
+            { 
+                id: 1, word: 'CLIENTE', dir: 'H', row: 5, col: 0, 
+                desc: "Objetivo fundamental del Triángulo Estratégico.",
+                exp: "¡Excelente! En el modelo de Ohmae, la estrategia busca ante todo maximizar el valor entregado al cliente, siendo la base y punto de partida de todo análisis.",
+                hintIndex: 0,
+                hints: [
+                    "Tiene 7 letras y empieza con 'C'.",
+                    "Es la persona u organización que compra tu producto o servicio.",
+                    "Hay un dicho muy famoso comercial que dice que siempre tiene la razón.",
+                    "Es uno de los tres vértices del Triángulo Estratégico.",
+                    "Sin esta figura, las empresas simplemente no tendrían a quién venderle."
+                ]
+            },
+            { 
+                id: 2, word: 'PATRON', dir: 'V', row: 0, col: 4, 
+                desc: "Una de las 5 P's de Mintzberg (Comportamiento consistente).",
+                exp: "¡Correcto! Mintzberg define la estrategia como Patrón, mostrando que también se evidencia como un comportamiento empírico y consistente en el tiempo, ya sea intencional o no.",
+                hintIndex: 0,
+                hints: [
+                    "Empieza con 'P' y tiene 6 letras.",
+                    "Se refiere a un modelo o algo que se repite constantemente.",
+                    "En costura, es el molde de papel que se usa para cortar la tela.",
+                    "En un diseño a cuadros, la repetición de las formas visuales crea un...",
+                    "Mintzberg lo asocia directamente con lograr la 'consistencia en el comportamiento'."
+                ]
+            },
+            { 
+                id: 3, word: 'PLAN', dir: 'V', row: 0, col: 2, 
+                desc: "Una de las 5 P's de Mintzberg (Guía intencional).",
+                exp: "¡Acertaste! La primera 'P' de Mintzberg define la estrategia como un Plan, es decir, una guía o curso de acción conscientemente determinado para abordar una situación.",
+                hintIndex: 0,
+                hints: [
+                    "Tiene 4 letras y empieza con 'P'.",
+                    "Es eso que diseñas y piensas justo antes de irte de viaje.",
+                    "Es un sinónimo corto de programa o proyecto.",
+                    "Se refiere a un curso de acción trazado para el futuro.",
+                    "Mintzberg dice que es una especie de 'guía de acción consciente'."
+                ]
+            },
+            { 
+                id: 4, word: 'ACTOR', dir: 'H', row: 2, col: 2, 
+                desc: "Participante clave dentro de un entorno estratégico.",
+                exp: "¡Muy bien! Para Ohmae, la estrategia exitosa requiere el equilibrio entre los tres actores clave del mercado: la Corporación, el Cliente y la Competencia.",
+                hintIndex: 0,
+                hints: [
+                    "Tiene 5 letras y empieza con 'A'.",
+                    "Alguien que interpreta un papel en una obra de teatro o en una película.",
+                    "Es una palabra que rima con tractor y motor.",
+                    "En el Triángulo Estratégico hay tres de estos que deben estar integrados.",
+                    "La compañía, el cliente y la competencia son cada uno un ___ clave."
+                ]
+            },
+            { 
+                id: 5, word: 'COSTE', dir: 'V', row: 5, col: 0, 
+                desc: "Factor que las empresas buscan minimizar constantemente.",
+                exp: "¡Perfecto! La Compañía interactúa con el Cliente entregando valor y buscando minimizar su Coste operativo frente a la Competencia para mejorar su margen.",
+                hintIndex: 0,
+                hints: [
+                    "Tiene 5 letras y empieza con 'C'.",
+                    "Es un sinónimo común de 'gasto' o 'precio de producción'.",
+                    "Es lo que las empresas siempre intentan reducir para ganar más dinero.",
+                    "Suele decirse la frase: 'Lograrlo a cualquier ___'.",
+                    "Ohmae indica que para ganar, debes mejorar tu producto y bajar su ___."
+                ]
+            },
+            { 
+                id: 6, word: 'GEL', dir: 'V', row: 4, col: 6, 
+                desc: "Iniciales del concepto para evitar el estancamiento ideando nuevas mejoras.",
+                exp: "¡Genial! Los Grados de Libertad Estratégica (GEL) permiten a la empresa innovar y satisfacer al usuario con el menor coste en áreas clave que realmente importan.",
+                hintIndex: 0,
+                hints: [
+                    "Son solo 3 letras y empieza con 'G'.",
+                    "Como pista paralela, es una sustancia viscosa, muy parecida a la que usas para fijar tu cabello.",
+                    "Son las siglas exactas de Grados de Libertad Estratégica.",
+                    "Ohmae lo usa para definir los ejes donde hay margen de maniobra tecnológica o comercial.",
+                    "La palabra se forma con las letras G, E y L."
+                ]
+            }
+        ];
+
+        const ROWS = 10;
+        const COLS = 7;
+        const grid = {}; 
+        let activeWordId = null;
+        let lockValidation = false; 
+        let finalModalShown = false;
+
+        function initGridData() {
+            puzzleData.forEach(item => {
+                for (let i = 0; i < item.word.length; i++) {
+                    let r = item.dir === 'H' ? item.row : item.row + i;
+                    let c = item.dir === 'H' ? item.col + i : item.col;
+                    let key = `${r}-${c}`;
+
+                    if (!grid[key]) {
+                        grid[key] = { words: [], isStart: false, number: null };
+                    }
+                    if (i === 0 && !grid[key].isStart) {
+                        grid[key].isStart = true;
+                        grid[key].number = item.id;
+                    } else if (i === 0 && grid[key].isStart) {
+                        grid[key].number = grid[key].number + "/" + item.id;
+                    }
+                    grid[key].words.push({ id: item.id, dir: item.dir, index: i });
+                }
+            });
+        }
+
+        function renderBoard() {
+            const board = document.getElementById('board');
+            
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    let key = `${r}-${c}`;
+                    let cellData = grid[key];
+
+                    let cellDiv = document.createElement('div');
+                    cellDiv.className = 'cell';
+                    cellDiv.style.gridRow = r + 1;
+                    cellDiv.style.gridColumn = c + 1;
+
+                    if (cellData) {
+                        if (cellData.isStart && cellData.number) {
+                            let numSpan = document.createElement('span');
+                            numSpan.className = 'cell-number';
+                            numSpan.textContent = cellData.number;
+                            cellDiv.appendChild(numSpan);
+                        }
+
+                        let input = document.createElement('input');
+                        input.type = 'text';
+                        input.maxLength = 1;
+                        input.id = `input-${r}-${c}`;
+                        input.dataset.row = r;
+                        input.dataset.col = c;
+                        
+                        input.addEventListener('focus', () => handleFocus(r, c, cellData));
+                        input.addEventListener('input', (e) => handleInput(e, r, c));
+                        input.addEventListener('keydown', (e) => handleKeyDown(e, r, c));
+                        
+                        cellDiv.appendChild(input);
+                    }
+                    board.appendChild(cellDiv);
+                }
+            }
+        }
+
+        function renderClues() {
+            const list = document.getElementById('clues-list');
+            puzzleData.forEach(item => {
+                let div = document.createElement('div');
+                div.className = 'clue-item';
+                div.id = `clue-${item.id}`;
+                div.innerHTML = `<strong>${item.id}. ${item.dir === 'H' ? 'Horizontal' : 'Vertical'}</strong>: ${item.desc}`;
+                div.onclick = () => {
+                    selectWord(item.id);
+                    focusFirstEmptyCell(item);
+                };
+                list.appendChild(div);
+            });
+        }
+
+        function handleFocus(r, c, cellData) {
+            if (lockValidation) return;
+            if (!activeWordId || !cellData.words.find(w => w.id === activeWordId)) {
+                selectWord(cellData.words[0].id);
+            }
+        }
+
+        function selectWord(id) {
+            if (lockValidation) return;
+            activeWordId = id;
+            document.querySelectorAll('.cell').forEach(el => el.classList.remove('active-word'));
+            document.querySelectorAll('.clue-item').forEach(el => el.classList.remove('active'));
+            
+            let wordObj = puzzleData.find(w => w.id === id);
+            document.getElementById(`clue-${id}`).classList.add('active');
+
+            for (let i = 0; i < wordObj.word.length; i++) {
+                let r = wordObj.dir === 'H' ? wordObj.row : wordObj.row + i;
+                let c = wordObj.dir === 'H' ? wordObj.col + i : wordObj.col;
+                let input = document.getElementById(`input-${r}-${c}`);
+                if (input) input.parentElement.classList.add('active-word');
+            }
+        }
+
+        function focusFirstEmptyCell(wordObj) {
+            for (let i = 0; i < wordObj.word.length; i++) {
+                let r = wordObj.dir === 'H' ? wordObj.row : wordObj.row + i;
+                let c = wordObj.dir === 'H' ? wordObj.col + i : wordObj.col;
+                let input = document.getElementById(`input-${r}-${c}`);
+                if (input && input.value === '') {
+                    input.focus();
+                    return;
+                }
+            }
+            let firstInput = document.getElementById(`input-${wordObj.row}-${wordObj.col}`);
+            if (firstInput) firstInput.focus();
+        }
+
+        function handleInput(e, r, c) {
+            if (lockValidation) {
+                e.preventDefault();
+                return;
+            }
+
+            e.target.value = e.target.value.toUpperCase().replace(/[^A-ZÑ]/g, '');
+
+            if (e.target.value !== '' && activeWordId) {
+                let wordObj = puzzleData.find(w => w.id === activeWordId);
+                let nextR = wordObj.dir === 'H' ? parseInt(r) : parseInt(r) + 1;
+                let nextC = wordObj.dir === 'H' ? parseInt(c) + 1 : parseInt(c);
+                let nextInput = document.getElementById(`input-${nextR}-${nextC}`);
+                
+                if (nextInput && !nextInput.parentElement.classList.contains('completed')) {
+                    nextInput.focus();
+                }
+            }
+            
+            let cellData = grid[`${r}-${c}`];
+            setTimeout(() => {
+                cellData.words.forEach(w => checkWordCompletion(w.id));
+            }, 50);
+        }
+
+        function handleKeyDown(e, r, c) {
+            if (lockValidation) return;
+
+            if (e.key === 'Backspace' && e.target.value === '' && activeWordId) {
+                let wordObj = puzzleData.find(w => w.id === activeWordId);
+                let prevR = wordObj.dir === 'H' ? r : r - 1;
+                let prevC = wordObj.dir === 'H' ? c - 1 : c;
+                let prevInput = document.getElementById(`input-${prevR}-${prevC}`);
+                
+                if (prevInput && !prevInput.parentElement.classList.contains('completed')) {
+                    prevInput.focus();
+                    prevInput.value = '';
+                }
+            }
+        }
+
+        function checkWordCompletion(wordId) {
+            if (lockValidation) return;
+            let wordObj = puzzleData.find(w => w.id === wordId);
+            
+            if (document.getElementById(`clue-${wordId}`).classList.contains('completed')) return;
+
+            let filledWord = "";
+            let inputs = [];
+            let isCompletelyFilled = true;
+
+            for (let i = 0; i < wordObj.word.length; i++) {
+                let r = wordObj.dir === 'H' ? wordObj.row : wordObj.row + i;
+                let c = wordObj.dir === 'H' ? wordObj.col + i : wordObj.col;
+                let input = document.getElementById(`input-${r}-${c}`);
+                inputs.push(input);
+                
+                if (input.value === '') {
+                    isCompletelyFilled = false;
+                    break;
+                }
+                filledWord += input.value.toUpperCase();
+            }
+
+            if (isCompletelyFilled) {
+                lockValidation = true;
+                activeWordId = wordId; 
+                
+                if (filledWord === wordObj.word) {
+                    inputs.forEach(input => {
+                        input.parentElement.classList.add('completed');
+                        input.readOnly = true;
+                    });
+                    document.getElementById(`clue-${wordObj.id}`).classList.add('completed');
+                    showModal('success', '¡Excelente!', wordObj.exp, "", "Continuar (Enter)");
+                } else {
+                    inputs.forEach(input => {
+                        if (!input.parentElement.classList.contains('completed')) {
+                            input.parentElement.classList.add('shake');
+                            setTimeout(() => input.parentElement.classList.remove('shake'), 400);
+                        }
+                    });
+                    
+                    let hintText = wordObj.hints[wordObj.hintIndex];
+                    let hintCountText = `Pista ${wordObj.hintIndex + 1} de ${wordObj.hints.length}`;
+                    
+                    showModal('error', 'Casi lo logras', hintText, hintCountText, "Intentar de nuevo (Enter)");
+                    
+                    if (wordObj.hintIndex < wordObj.hints.length - 1) {
+                        wordObj.hintIndex++;
+                    }
+                    
+                    window.pendingClearInputs = inputs.filter((inp, i) => !inp.parentElement.classList.contains('completed') && inp.value !== wordObj.word[i]);
+                }
+            }
+        }
+
+        function showModal(type, title, message, counterText = "", buttonText = null) {
+            const modal = document.getElementById('modal');
+            const content = document.getElementById('modal-content');
+            const btn = document.getElementById('modal-btn');
+            
+            content.className = `modal-content ${type}`;
+            document.getElementById('modal-icon').innerHTML = type === 'success' ? '🌟' : '💡';
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-message').innerText = message;
+            
+            const counterEl = document.getElementById('modal-hint-counter');
+            counterEl.textContent = counterText;
+            
+            if (buttonText) {
+                btn.textContent = buttonText;
+            } else {
+                btn.textContent = type === 'success' ? 'Continuar (Enter)' : 'Intentar de nuevo (Enter)';
+            }
+            
+            modal.classList.add('show');
+        }
+
+        function closeModal() {
+            if (!lockValidation) return;
+            const modal = document.getElementById('modal');
+            modal.classList.remove('show');
+            lockValidation = false;
+            
+            if (window.pendingClearInputs && window.pendingClearInputs.length > 0) {
+                window.pendingClearInputs.forEach(inp => inp.value = '');
+                window.pendingClearInputs[0].focus();
+                window.pendingClearInputs = null;
+            }
+            
+            let allDone = puzzleData.every(w => document.getElementById(`clue-${w.id}`).classList.contains('completed'));
+            if (allDone && !finalModalShown) {
+                finalModalShown = true;
+                lockValidation = true;
+                setTimeout(() => {
+                    showModal('success', '¡Reto Superado!', 'Has completado exitosamente el crucigrama estratégico con los enfoques de Ohmae y Mintzberg.', "", "¡Genial! (Enter)");
+                    document.getElementById('modal-icon').innerHTML = '🏆';
+                }, 300);
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            const modal = document.getElementById('modal');
+            if (modal.classList.contains('show') && (e.key === 'Enter' || e.key === 'Escape')) {
+                e.preventDefault();
+                closeModal();
+            }
+        });
+
+        window.onload = () => {
+            initGridData();
+            renderBoard();
+            renderClues();
+        };
+    </script>
+</body>
+</html>
